@@ -64,7 +64,7 @@ spec:
     spec:
       containers:
         - name: php-fpm
-          image: ccr.ccs.tencentyun.com/xspace/openpilot-installer:0.0.1.49.22a1683
+          image: ccr.ccs.tencentyun.com/xspace/openpilot-installer:0.0.1.28.8c5ac6f
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9000
@@ -126,8 +126,10 @@ metadata:
   namespace: openpilot-installer
   name: php-fpm-nginx-ingress
 spec:
+  ingressClassName: nginx
   rules:
-    - http:
+    - host: openpilot.bgton.cn
+      http:
         paths:
           - path: /
             pathType: Prefix
@@ -136,4 +138,3 @@ spec:
                 name: php-fpm-nginx-svc
                 port:
                   number: 80
-  ingressClassName: nginx

@@ -1,0 +1,138 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-nginx-proxy
+  labels:
+    app: github-proxy
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: github-nginx-proxy
+  name: nginx-conf
+  labels:
+    app: nginx-conf
+data:
+  nginx.conf: |
+    user  nginx;
+    worker_processes  1;
+
+    error_log  /var/log/nginx/error.log warn;
+    pid        /var/run/nginx.pid;
+
+    events {
+      worker_connections  1024;
+    }
+
+    http {
+      include       /etc/nginx/mime.types;
+      default_type  application/octet-stream;
+
+      log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+      '$status $body_bytes_sent "$http_referer" '
+      '"$http_user_agent" "$http_x_forwarded_for"';
+
+      access_log  /var/log/nginx/access.log  main;
+
+      sendfile        on;
+      #tcp_nopush     on;
+
+      keepalive_timeout  65;
+
+      #gzip  on;
+
+      upstream github {
+          server github.com:443;
+          keepalive 120;
+      }
+      server
+      {
+          listen 80;
+          server_name github.bgton.cn;
+          if ($http_user_agent ~* "qihoobot|Baiduspider|Googlebot|Googlebot-Mobile|Googlebot-Image|Mediapartners-Google|Adsbot-Google|Feedfetcher-Google|Yahoo! Slurp|Yahoo! Slurp China|YoudaoBot|Sosospider|Sogou spider|Sogou web spider|MSNBot|ia_archiver|Tomato Bot") {
+              return 403;
+          }
+          location / {
+              proxy_set_header Accept-Encoding "";
+              proxy_set_header Connection "";
+              proxy_http_version 1.1;
+              proxy_connect_timeout    120s;
+              proxy_read_timeout       120s;
+              proxy_set_header Host github.com;
+              proxy_hide_header Strict-Transport-Security;
+              proxy_pass https://github;
+          }
+      }
+    }
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: github-nginx-proxy
+  name: github-proxy
+  labels:
+    app: github-proxy
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+  selector:
+    app: github-proxy
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  namespace: github-nginx-proxy
+  name: github-proxy
+  labels:
+    app: github-proxy
+spec:
+  replicas: 1
+  serviceName: github-proxy
+  selector:
+    matchLabels:
+      app: github-proxy
+  template:
+    metadata:
+      labels:
+        app: github-proxy
+    spec:
+      containers:
+        - name: github-proxy
+          image: nginx:stable-alpine
+          volumeMounts:
+            - mountPath: /etc/nginx/nginx.conf
+              name: nginx-conf
+              subPath: nginx.conf
+
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: nginx-conf
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  namespace: github-nginx-proxy
+  name: github-nginx-proxy-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: github.bgton.cn
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: github-proxy
+                port:
+                  number: 80
