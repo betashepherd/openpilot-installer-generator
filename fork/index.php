@@ -68,7 +68,7 @@ if ($loading_msg == "") {  # if not an alias with custom msg and not specified u
     $loading_msg = str_replace(" ", "%20", $loading_msg);
 }
 
-$loading_msg = "欢迎使用openpilot，请安全驾驶!";
+$loading_msg = "欢迎使用openpilot,请安全驾驶!";
 
 //logData();
 
